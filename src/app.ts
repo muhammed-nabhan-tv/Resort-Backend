@@ -1,7 +1,7 @@
 
 import express from "express";
 import cors from "cors";
-import { prisma } from "./lib/prisma";
+
 
 const app = express();
 
@@ -18,24 +18,6 @@ app.get("/api/health", (_req, res) => {
     });
 });
 
-
-app.get("/api/health/db", async (_req, res) => {
-    try {
-        await prisma.$queryRaw`SELECT 1`;
-
-        res.status(200).json({
-            success: true,
-            message: "Database connection successful",
-        });
-    } catch (error) {
-        console.error("Database health check failed:", error);
-
-        res.status(500).json({
-            success: false,
-            message: "Database connection failed",
-        });
-    }
-});
 
 
 export default app;
