@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { USER_ROLES, type UserRole } from "../../models/user.model";
+
 
 export const registerSchema = z.object({
     name: z
@@ -23,14 +23,14 @@ export const registerSchema = z.object({
         .optional()
         .nullable(),
     role: z
-        .enum(USER_ROLES, {
-            message: `Role must be one of: ${USER_ROLES.join(", ")}`,
-        })
+        .enum(["CUSTOMER", "OWNER"])
         .optional()
         .default("CUSTOMER"),
+
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
+
 
 export const verifyOtpSchema = z.object({
     email: z
@@ -56,3 +56,16 @@ export const resendOtpSchema = z.object({
 });
 
 export type ResendOtpInput = z.infer<typeof resendOtpSchema>;
+
+export const loginSchema = z.object({
+    email: z
+        .string({ message: "Email is required" })
+        .trim()
+        .email("Please provide a valid email")
+        .toLowerCase(),
+    password: z
+        .string({ message: "Password is required" })
+        .min(1, "Password is required"),
+});
+
+export type LoginInput = z.infer<typeof loginSchema>;

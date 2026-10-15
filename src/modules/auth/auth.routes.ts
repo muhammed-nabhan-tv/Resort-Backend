@@ -1,7 +1,19 @@
+
+
 import { Router } from "express";
-import { register, verifyOtp, resendOtp } from "./auth.controller";
+import {
+    register,
+    login,
+    verifyOtp,
+    resendOtp,
+} from "./auth.controller";
 import { validate } from "../../middleware/validate";
-import { registerSchema, verifyOtpSchema, resendOtpSchema } from "./auth.validation";
+import {
+    registerSchema,
+    loginSchema,
+    verifyOtpSchema,
+    resendOtpSchema,
+} from "./auth.validation";
 
 const router = Router();
 
@@ -11,6 +23,7 @@ const router = Router();
  * @access  Public
  */
 router.post("/register", validate(registerSchema), register);
+router.post("/login", validate(loginSchema), login);
 
 /**
  * @route   POST /api/auth/verify-otp

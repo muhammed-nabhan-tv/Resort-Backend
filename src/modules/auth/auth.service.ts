@@ -1,6 +1,7 @@
+
 import { User } from "../../models/user.model";
 import { RefreshToken } from "../../models/refresh-token.model";
-import { hashPassword } from "../../utils/password";
+import { hashPassword, comparePassword } from "../../utils/password";
 import {
     generateAccessToken,
     generateRefreshToken,
@@ -9,7 +10,13 @@ import {
 } from "../../utils/jwt";
 import { AppError } from "../../utils/errors";
 import { sendOtpEmail } from "../email/email.service";
-import type { RegisterInput, VerifyOtpInput, ResendOtpInput } from "./auth.validation";
+import type {
+    RegisterInput,
+    LoginInput,
+    VerifyOtpInput,
+    ResendOtpInput,
+} from "./auth.validation";
+
 
 export interface RegisterInitResult {
     email: string;
@@ -26,6 +33,21 @@ export interface AuthSessionResult {
         phone: string | null;
         role: string;
         isVerified: boolean;
+        createdAt: Date;
+    };
+    tokens: {
+        accessToken: string;
+        refreshToken: string;
+    };
+}
+
+export interface LoginResult {
+    user: {
+        id: string;
+        name: string;
+        email: string;
+        phone: string | null;
+        role: string;
         createdAt: Date;
     };
     tokens: {
@@ -73,17 +95,22 @@ export const registerUser = async (input: RegisterInput): Promise<RegisterInitRe
     // Hash password
     const passwordHash = await hashPassword(input.password);
 
-    // Generate 6-digit OTP code & 10-minute expiry
+
+    // Generate 6-digit OTP code and 10-minute expiry
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    // Create unverified user
+    // Assign the user's role
+    const assignedRole =
+        input.role === "OWNER" ? "OWNER" : "CUSTOMER";
+
+    // Create an unverified user
     const newUser = await User.create({
         name: input.name.trim(),
         email: normalizedEmail,
         passwordHash,
         phone: input.phone?.trim() || null,
-        role: input.role || "CUSTOMER",
+        role: assignedRole,
         isVerified: false,
         otpCode: otp,
         otpExpiresAt,
@@ -166,31 +193,109 @@ export const verifyOtpService = async (input: VerifyOtpInput): Promise<AuthSessi
     };
 };
 
+
 /**
  * Resends a fresh 6-digit OTP code to an unverified user.
  */
-export const resendOtpService = async (input: ResendOtpInput): Promise<{ message: string; email: string }> => {
+export const resendOtpService = async (
+    input: ResendOtpInput
+): Promise<{ message: string; email: string }> => {
     const normalizedEmail = input.email.toLowerCase().trim();
 
     const user = await User.findOne({ email: normalizedEmail });
+
     if (!user) {
         throw new AppError("No account found with this email address", 404);
     }
 
     if (user.isVerified) {
-        throw new AppError("Account is already verified. You can sign in directly.", 400);
+        throw new AppError(
+            "Account is already verified. You can sign in directly.",
+            400
+        );
     }
 
-    // Generate new OTP & 10-minute expiry
+    // Generate a new OTP with a 10-minute expiry
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     user.otpCode = otp;
     user.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    await user.save();
 
+    await user.save();
     await sendOtpEmail(normalizedEmail, otp, user.name);
 
     return {
         email: user.email,
         message: "A new 6-digit verification code has been sent to your email.",
+    };
+};
+
+/**
+ * Authenticates an existing user and creates a session.
+ */
+export const loginUser = async (
+    input: LoginInput
+): Promise<LoginResult> => {
+    const normalizedEmail = input.email.toLowerCase().trim();
+
+    // Find the user by email
+    const existingUser = await User.findOne({
+        email: normalizedEmail,
+    });
+
+    if (!existingUser) {
+        throw new AppError("Invalid email or password", 401);
+    }
+
+    // Compare the submitted password with the stored hash
+    const isPasswordValid = await comparePassword(
+        input.password,
+        existingUser.passwordHash
+    );
+
+    if (!isPasswordValid) {
+        throw new AppError("Invalid email or password", 401);
+    }
+
+    // Prevent unverified accounts from logging in
+    if (!existingUser.isVerified) {
+        throw new AppError(
+            "Please verify your email before logging in.",
+            403
+        );
+    }
+
+    // Prepare the user information for JWT generation
+    const tokenPayload = {
+        userId: existingUser._id.toString(),
+        email: existingUser.email,
+        role: existingUser.role,
+    };
+
+    const accessToken = generateAccessToken(tokenPayload);
+    const refreshToken = generateRefreshToken(tokenPayload);
+
+    // Store a hash of the refresh token
+    const tokenHash = hashToken(refreshToken);
+    const expiresAt = calculateRefreshTokenExpiryDate();
+
+    await RefreshToken.create({
+        userId: existingUser._id,
+        tokenHash,
+        expiresAt,
+    });
+
+    return {
+        user: {
+            id: existingUser._id.toString(),
+            name: existingUser.name,
+            email: existingUser.email,
+            phone: existingUser.phone ?? null,
+            role: existingUser.role,
+            createdAt: existingUser.createdAt,
+        },
+        tokens: {
+            accessToken,
+            refreshToken,
+        },
     };
 };

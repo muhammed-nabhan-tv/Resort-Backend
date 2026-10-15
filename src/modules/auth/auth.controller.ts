@@ -1,11 +1,19 @@
+
 import type { Request, Response, NextFunction } from "express";
-import { registerUser, verifyOtpService, resendOtpService } from "./auth.service";
+import {
+    registerUser,
+    loginUser,
+    verifyOtpService,
+    resendOtpService,
+} from "./auth.service";
 import { AppError } from "../../utils/errors";
-import type { RegisterInput, VerifyOtpInput, ResendOtpInput } from "./auth.validation";
+import type {
+    RegisterInput,
+    LoginInput,
+    VerifyOtpInput,
+    ResendOtpInput,
+} from "./auth.validation";
 
-
-//   Handles user registration request & sends OTP
-//   POST /api/auth/register
 
 export const register = async (
     req: Request<{}, {}, RegisterInput>,
@@ -40,7 +48,7 @@ export const register = async (
 
 //   Verifies 6-digit OTP and authenticates user
 //   POST /api/auth/verify-otp
- 
+
 export const verifyOtp = async (
     req: Request<{}, {}, VerifyOtpInput>,
     res: Response,
@@ -51,6 +59,7 @@ export const verifyOtp = async (
 
         // Store refresh token in secure HTTP-only cookie for web browsers
         const isProduction = process.env.NODE_ENV === "production";
+
         res.cookie("refreshToken", result.tokens.refreshToken, {
             httpOnly: true,
             secure: isProduction,
@@ -68,14 +77,6 @@ export const verifyOtp = async (
             },
         });
     } catch (error) {
-        if (error instanceof AppError) {
-            res.status(error.statusCode).json({
-                success: false,
-                message: error.message,
-            });
-            return;
-        }
-
         next(error);
     }
 };
@@ -89,6 +90,7 @@ export const resendOtp = async (
     next: NextFunction
 ): Promise<void> => {
     try {
+
         const result = await resendOtpService(req.body);
 
         res.status(200).json({
@@ -107,6 +109,37 @@ export const resendOtp = async (
             return;
         }
 
+        next(error);
+    }
+};
+
+// POST /api/auth/login
+export const login = async (
+    req: Request<{}, {}, LoginInput>,
+    res: Response,
+    next: NextFunction
+): Promise<void> => {
+    try {
+        const result = await loginUser(req.body);
+
+        const isProduction = process.env.NODE_ENV === "production";
+
+        res.cookie("refreshToken", result.tokens.refreshToken, {
+            httpOnly: true,
+            secure: isProduction,
+            sameSite: isProduction ? "strict" : "lax",
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Login successful",
+            data: {
+                user: result.user,
+                accessToken: result.tokens.accessToken,
+            },
+        });
+    } catch (error) {
         next(error);
     }
 };
