@@ -30,6 +30,18 @@ const userSchema = new Schema(
             enum: USER_ROLES,
             default: "CUSTOMER",
         },
+        isVerified: {
+            type: Boolean,
+            default: false,
+        },
+        otpCode: {
+            type: String,
+            default: null,
+        },
+        otpExpiresAt: {
+            type: Date,
+            default: null,
+        },
     },
     { timestamps: true },
 );

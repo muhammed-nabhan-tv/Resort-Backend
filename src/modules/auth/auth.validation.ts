@@ -31,3 +31,28 @@ export const registerSchema = z.object({
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
+
+export const verifyOtpSchema = z.object({
+    email: z
+        .string({ message: "Email is required" })
+        .trim()
+        .email("Please provide a valid email address")
+        .toLowerCase(),
+    otp: z
+        .string({ message: "OTP is required" })
+        .trim()
+        .length(6, "OTP must be exactly 6 digits")
+        .regex(/^\d{6}$/, "OTP must consist of digits only"),
+});
+
+export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;
+
+export const resendOtpSchema = z.object({
+    email: z
+        .string({ message: "Email is required" })
+        .trim()
+        .email("Please provide a valid email address")
+        .toLowerCase(),
+});
+
+export type ResendOtpInput = z.infer<typeof resendOtpSchema>;
