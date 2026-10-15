@@ -2,7 +2,7 @@ import express, { type Request, type Response, type NextFunction } from "express
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import authRoutes from "./modules/auth/auth.routes";
-
+import resortRoutes from "./modules/resorts/resorts.routes";
 const app = express();
 
 // Standard middleware
@@ -25,7 +25,7 @@ app.get("/api/health", (_req: Request, res: Response) => {
 
 // Module routes
 app.use("/api/auth", authRoutes);
-
+app.use("/api/resorts", resortRoutes);
 // Global 404 handler for unknown routes
 app.use((_req: Request, res: Response) => {
     res.status(404).json({
